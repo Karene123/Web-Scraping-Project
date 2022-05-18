@@ -1,0 +1,212 @@
+---
+title: "Web_Scrapping_census"
+author: "Pape Seye & Karene Matoka Nana"
+date: "28/04/2022"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(rvest)
+library(dplyr)
+library(tidyverse)
+library(repurrrsive)
+listviewer::jsonedit(gh_users)
+library(lubridate)
+library(tidycensus)
+
+```
+
+
+We're interested in exploring the trends in the youth population across the United States. To do so, we visited the US Census Bureau website that contains many data sets about population that we can take advantage of through webscrapping with API techniques.
+
+We first obtain an API key in order to create a link with the website data and our R file.
+
+```{r}
+
+census_api_key("b38c549627c94cd926ca2f00eb10ea28e62bdd46")
+install = TRUE
+
+```
+
+
+We then identify data that could be relevent to our exploring and decide to use the data that records population under 18 by state and separated by race (black, hispanic, white, indian etc). We picked the data that was recorded for the year 2010 so the whole analysis will be done for the year 2010.
+
+We then bring those datasets into our R-file using folowing webscrapping coding: 
+
+
+```{r}
+#Black population under 18 years old by state.
+U18black <- get_decennial(geography = "state", 
+                       variables = "P016B002", 
+                       year = 2010)
+
+#Hispanic or Latino population under 18 years old by state.
+U18latino <- get_decennial(geography = "state", 
+                       variables = "P016H002", 
+                       year = 2010)
+
+#White population under 18 years old by state.
+U18white <- get_decennial(geography = "state", 
+                       variables = "P016A002", 
+                       year = 2010)
+
+#Asian population under 18 years old by state.
+U18asian <- get_decennial(geography = "state", 
+                       variables = "P016D002", 
+                       year = 2010)
+
+#We then get the following tables that gives us population under 18 for each selected race/ethnicity (black, hispanic, white, asian) and for each state.
+
+U18black
+U18latino
+U18white
+U18asian
+
+```
+
+Let's change some of the column names to make them more exlicit:
+
+```{r}
+# We change "NAME" into "State" and "value" into "U18Population"
+
+U18black %>%
+  rename(State = NAME, U18Population = value) -> U18black2
+
+U18white %>%
+  rename(State = NAME, U18Population = value) -> U18white2
+
+U18latino %>%
+  rename(State = NAME, U18Population = value) -> U18latino2
+
+U18asian %>%
+  rename(State = NAME, U18Population = value) -> U18asian2
+
+
+```
+
+
+
+Many questions of interest can arise: 
+- What are the states that have the highest under 18 population for each race ? 
+- What does the distribution  of the states' population under 18 looks like for each race ?
+- What states have the highest under 18 population for black and whites combined ?
+
+
+Those questions can now be answered through data visualisation and R coding.
+
+```{r}
+#States with higest population U18 by race: 
+
+#For black:
+U18black2 %>%
+  arrange(desc(U18Population)) %>%
+  slice(1:5)
+#For white:
+U18white2 %>%
+  arrange(desc(U18Population)) %>%
+  slice(1:5)
+#For hispanic/latino
+U18latino2 %>%
+  arrange(desc(U18Population)) %>%
+  slice(1:5)
+#For asian
+U18asian2 %>%
+  arrange(desc(U18Population)) %>%
+  slice(1:5)
+
+#From these tables we see that for black people for example, the 5 five states with highest under 18 population are: Florida, Georgia, Texas, New York and California.
+
+
+```
+
+We can also have a more visual approach to answering this question through the following plots: 
+
+```{r}
+U18black2 %>%
+  ggplot(aes(x = U18Population, y = reorder(State, U18Population))) +
+  geom_point(color = "blue", size = 2) +
+  labs(title = "Black population under 18 by State",
+       subtitle = "From 2010 census bureau data",
+       y = "",
+       x = "black population under 18")
+
+U18white2 %>%
+  ggplot(aes(x = U18Population, y = reorder(State, U18Population))) +
+  geom_point(color = "blue", size = 2) +
+  labs(title = "White population under 18 by State",
+       subtitle = "From 2010 census bureau data",
+       y = "",
+       x = "white population under 18")
+
+
+# These graphs give us the same information as the previous tables but with a better visual display.
+```
+
+
+What does the distribution of the states' under 18 population for each race looks like ?
+
+```{r}
+
+# For black:
+ggplot(data = U18black2, mapping = aes(x = U18Population)) +
+  geom_histogram(bins = 13) +
+  ggtitle("Histogram for states' black population under 18 years old")
+
+ggplot(data = U18white2, mapping = aes(x = U18Population)) +
+  geom_histogram(bins = 13) +
+  ggtitle("Histogram for states' white population under 18 years old")
+
+ggplot(data = U18latino2, mapping = aes(x = U18Population)) +
+  geom_histogram(bins = 13) +
+  ggtitle("Histogram for states' hispanic/latino population under 18 years old")
+
+ggplot(data = U18asian2, mapping = aes(x = U18Population)) +
+  geom_histogram(bins = 13) +
+  ggtitle("Histogram for states' asian population under 18 years old")
+
+```
+
+
+- What states have the highest under 18 population for black and whites combined ?
+
+```{r}
+# We first combine our tables for black and white using full join with GEOID as our key.
+# We than create the new variable bwPop that is the black and white under 18 population combined.
+
+full_join(U18black2, U18white2, by = "GEOID") -> bwU18
+
+bwU18 %>%
+  mutate(bwPop = U18Population.x + U18Population.y) %>%
+  ggplot(aes(x = bwPop, y = reorder(State.x, bwPop))) +
+  geom_point(color = "blue", size = 2) +
+  labs(title = "Black and white population under 18 by State",
+       subtitle = "From 2010 census bureau data",
+       y = "",
+       x = "black and white population under 18")
+
+
+# So: California, Texas, Florida, New York and Illinois are the states with the highest under 18 population for black and white people combined.
+
+```
+
+We can see that the data we scrapped and organized can be used to answer a wide range of interesting questions about the trends in the US population under 18.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
